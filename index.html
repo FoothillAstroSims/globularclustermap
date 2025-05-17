@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+  
+  <title>Globular Cluster Map Simulator</title>
+    
+    <style>
+        .inputs {
+            display: inline-block;
+            border: 2px outset black;
+            background-color: lightblue;
+            text-align: left;
+            float:left;
+            height:500px;
+        }
+        .outputs {
+            display: inline-block;
+            border: 2px outset black;
+            background-color: lightblue;
+            text-align: left;
+            height:220px;
+            vertical-align: middle;
+        }
+        .visualization {
+            display: inline-block;
+            background-color: white;
+
+            color:white;
+        }
+        .upper-right {
+            position:absolute;
+            top:0;
+            right:10px;
+        }
+        .container {
+            display:flex;
+        }
+    </style>
+
+          <!-- P5 for animations -->
+        <script src="https://github.com/processing/p5.js/releases/download/v1.4.2/p5.min.js"></script>  
+            
+        <!-- Plotly for plotting, MIT license -->
+        <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>       
+   
+        <!-- Math.js, Apache 2.0 license -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/7.1.0/math.min.js"></script>  
+
+    
+</head>
+
+<body style="font-family:sans-serif; font-size:15px; width:800px; margin-left:auto; margin-right:auto;">
+
+    <h3 id="pageHeader"><a href="https://foothill.edu/astronomy/astrosims.html" target=_blank>AstroSims</a> > Globular Cluster Map Simulator</h3>
+    
+    
+<div class="container">
+        <div id="stellarParameters" class="inputs">
+                <p><b>Galaxy properties</b></p>
+                &nbsp; &nbsp; Galaxy radius (1000 light-years)<br>
+                     &nbsp; &nbsp;<input id="galaxyRadiusSlider" type ="range" min="10" max="100" step="1" value="Error" oninput="updateInputs(0,1)"> 
+                    <input type="text" id="galaxyRadiusDisplay" size="4" value="1" oninput="updateInputs(0,0)">  <br>
+                &nbsp; &nbsp; Central bulge  (1000 light-years)  <br>
+                     &nbsp; &nbsp;<input id="centralBulgeSlider" type ="range" min="5" max="50" step="1" value="Error" oninput="updateInputs(1,1)">
+                    <input type="text" id="centralBulgeDisplay" size="4" value="1" oninput="updateInputs(1,0)">  <br>
+                &nbsp; &nbsp; # of globular clusters   <br>
+                     &nbsp; &nbsp;<input id="numberGlobularsSlider" type ="range" min="0" max="1000" step="1" value="Error" oninput="updateInputs(2,1)"> 
+                    <input type="text" id="numberGlobularsDisplay" size="4" value="1" oninput="updateInputs(2,0)">  <br>
+            
+                <p><b>Our properties</b></p>
+                &nbsp; &nbsp; Distance from center (1000 light-years) <br>
+                     &nbsp; &nbsp;<input id="centerDistanceSlider" type ="range" min="0" max="100" step="1" value="Error" oninput="updateInputs(3,1)">        
+                    <input type="text" id="centerDistanceDisplay" size="4" value="1" oninput="updateInputs(3,0)">  <br>
+<!--                &nbsp; &nbsp; Detection limit  <br>
+                     &nbsp; &nbsp;<input id="rangeSlider" type ="range" min="10" max="100" step="1" value="Error" oninput="updateInputs(4,1)">
+                    <input type="text" id="rangeDisplay" size="4" value="1" oninput="updateInputs(4,0)">  <br>
+-->        
+ 
+            
+            </div>
+        
+
+        <div id="galaxyMap" class="visualization">
+        </div>
+        <div id="infoLink" class="upper-right" onclick="popupInfo()">
+            <h3  onmouseclick="popupInfo()">&#9432;</h3>
+        </div>
+
+    
+</div>
+
+    
+  <script>
+
+
+      // galaxy and view initial parameters
+      //  radius, bulge radius, # globular clusters, distance from center, detection range
+      inputs = [];
+      limits = [];
+  
+      // initialize interface variables
+      // names of the interface elements for each variable
+      interfaces = [['galaxyRadiusDisplay','galaxyRadiusSlider'],['centralBulgeDisplay','centralBulgeSlider'], 
+            ['numberGlobularsDisplay','numberGlobularsSlider'], ['centerDistanceDisplay','centerDistanceSlider']];
+      //, ['rangeDisplay','rangeSlider']];
+      // indicate if sliders are on a log scale
+      logsliders = [false, false, false, false];
+
+      // initialize globular cluster coordinates
+      r0 = [];
+      theta0 = [];
+      phi0 = [];
+      
+      plotter = document.getElementById('galaxyMap');
+      Plotly.react(plotter);
+
+      reset();
+
+
+ 
+      
+      // For using URL parameters *************************************************************************
+      //   read parameters from URL
+//      var urlParams = (new URL(document.location)).searchParams;
+//      //console.log("Params are: "+urlParams);
+//      if (urlParams.has('mass') == true) {
+//          document.getElementById(interfaces[0][0]).value = urlParams.get('mass');
+//          updateInputs(0,0);
+//      }
+//      if (urlParams.has('luminosity') == true) {
+//          document.getElementById(interfaces[1][0]).value = urlParams.get('luminosity');
+//          updateInputs(1,0);
+//      }
+//      if (urlParams.has('realistic') == true) {
+//          document.getElementById("realisticOnly").checked = true;
+//          updateRealistic();
+//      }
+//      if (urlParams.has('fixedMass') == true) {
+//          document.getElementById(interfaces[0][0]).disabled = true;
+//          document.getElementById(interfaces[0][1]).disabled = true;
+//          document.getElementById("realisticOnly").disabled = true;
+//          document.getElementById("realisticLabel").style.color = "#aaaaaa";
+//      }
+//      if (urlParams.has('fixedLuminosity') == true) {
+//          document.getElementById(interfaces[1][0]).disabled = true;
+//          document.getElementById(interfaces[1][1]).disabled = true;
+//          document.getElementById("realisticOnly").disabled = true;
+//          document.getElementById("realisticLabel").style.color = "#aaaaaa";
+//      }
+//      if (urlParams.has('hideHeader') == true) {
+//          //console.log("Fixed luminosity");
+//          document.getElementById("pageHeader").style.display = "none";
+//      }
+
+
+
+      function setup() {
+          console.log("Setup Called");
+          boxright = document.getElementById("stellarParameters");
+          x0 = boxright.getBoundingClientRect().left;
+          x1 = boxright.getBoundingClientRect().right;
+          y0 = boxright.getBoundingClientRect().bottom;
+          
+          resetGalaxy = createButton('Reset');
+          resetGalaxy.position(x0+10,y0-25);
+          resetGalaxy.mousePressed(reset);
+
+          infoButton = createButton('Info');
+          infoButton.position(x1-50,y0-25);
+          infoButton.mousePressed(popupInfo);
+          
+          generateGalaxy();
+          
+      }
+      
+
+
+      function reset() {
+          inputs = [50, 5, 150, 25];
+          limits = [[10, 100], [5, 50], [0, 1000], [0, 150]];
+          updateNumDisplay(); 
+          initializePlot();
+          generateGalaxy();
+          drawGalaxy();
+      }
+      
+      function updateInputs(iVar, iMode) {
+          //console.log(iVar, iMode);
+          
+          // adjust value by typing
+          if (iMode == 0) {
+                inputs[iVar] = document.getElementById(interfaces[iVar][0]).value;
+                if (logsliders[iVar] == false) {
+                    document.getElementById(interfaces[iVar][1]).value = inputs[iVar];
+                }
+                if (logsliders[iVar] == true) {
+                    document.getElementById(interfaces[iVar][1]).value = Math.log10(inputs[iVar]);
+                }
+          }
+          // adjust values by slider
+          if (iMode == 1) {
+              if (logsliders[iVar] == false) {
+                  inputs[iVar] = document.getElementById(interfaces[iVar][1]).value;
+              }
+              if (logsliders[iVar] == true) {
+                  inputs[iVar] = trimNum(10**document.getElementById(interfaces[iVar][1]).value,2);
+              }
+          }               
+          
+          // vary the update function by slider adjustment 
+          if (iVar <= 2) {
+              generateGalaxy();          
+          }
+          
+          updateNumDisplay();
+          
+          if (iVar == 4) {
+              initializePlot();          
+          }
+          
+          //initializePlot();
+          drawGalaxy();
+      }
+
+
+      function updateNumDisplay() {
+          console.log('Update Numbers Display called ');
+
+          for (var i = 0; i < inputs.length; i++) {
+              document.getElementById(interfaces[i][0]).value = inputs[i].toLocaleString(undefined, {minimumFractionDigits:0, maximumSignificantDigits: 2});  
+              if (logsliders[i] == false) {
+                  document.getElementById(interfaces[i][1]).value = inputs[i];
+              }
+              else {
+                  document.getElementById(interfaces[i][1]).value = Math.log10(inputs[i]);
+              }
+          }
+      }
+      
+      function trimNum(input, toPrec) {
+                var numPlaces = Math.floor(Math.log10(input));
+                var divideBy = 10**(numPlaces - toPrec);
+                return divideBy * Math.floor(input / divideBy);
+      }
+      
+      function initializePlot() {
+          // initialize plot
+//          detLim = inputs[4] * 1;
+//          detLim0 = limits[4][0] * 1;
+//          detLim1 = limits[4][1] * 1;
+          imWidth = 500;
+          //console.log("Limit: " + detLim + ' out of ' + detLim1 + ' minimum of: ' + detLim0);
+          Plotly.relayout(plotter, {
+              width: imWidth,
+              height: imWidth,
+          });
+          
+          plotLayout = {
+              margin: {
+                  l:40,
+                  t:30,
+                  b:30,
+                  r:30,
+                  pad: 0
+              },
+              title: {
+                  font: {
+                      family: 'Calibri, monospace',
+                      size: 22,
+                      color: 'black'
+                  },
+                  x: 0.01,
+                  y: 1
+              },
+              showlegend: false,
+              polar: {
+                  bgcolor: "white",
+
+                  angularaxis: {
+                      tickwidth: 2,
+                      linewidth: 3,
+                      layer: "below traces"
+                  },
+                  radialaxis: {
+                      range: [0, 100],
+                      side: "counterclockwise",
+                      showline: true,
+                      linewidth: 2,
+                      tickwidth: 2,
+                      gridwidth: 2,
+                      dtick: 10
+                  }
+              },
+          };
+      }
+      
+      function generateGalaxy() {
+          //console.log("Generate Galaxy Called");
+          r0=[];
+          theta0=[];
+          phi0=[];
+          for (let i = 0; i < inputs[2]; i++) {
+              if (i < 0.2 * inputs[2]) {
+                  r0[i] = Math.random() * (inputs[1]);
+              } else {
+                  r0[i] = Math.random() * (inputs[0]);
+              }
+              theta0[i]=Math.random() * (360);
+              phi0[i]=Math.random() * (180)-90;
+          }
+
+      }
+
+      function drawGalaxy() {
+          //console.log('Draw Galaxy called ');
+          //console.log('  distance from galaxy: ' + inputs[3]);
+          offset = inputs[3] * 1;
+          r1 = [];
+          x = [];
+          y = [];
+          r = [];
+          theta = [];
+          for (let i = 0; i < inputs[2]; i++) {
+              r1[i] = r0[i] * Math.cos(phi0[i] * Math.PI/180);
+              x[i] = (r1[i] * Math.cos(theta0[i] * Math.PI/180));
+              x[i] = x[i] + offset;
+              y[i]= r1[i] * Math.sin(theta0[i] * Math.PI/180);
+              r[i]=Math.pow((Math.pow(x[i], 2) + Math.pow(y[i], 2)),0.5);
+              theta[i]=(Math.atan2(y[i], x[i]) * 180 / Math.PI);
+          }
+          //console.log('  first point:');
+          //console.log('    r0:     ' + r0[0]);
+          //console.log('    theta0: ' + theta0[0]);
+          //console.log('    phi0:   ' + phi0[0]);
+          //console.log('    r1:     ' + r1[0]);
+          //console.log('    x:      ' + x[0]);
+          //console.log('    y:      ' + y[0]);
+          //console.log('    r:      ' + r[0]);
+          //console.log('    theta:  ' + theta[0]);
+                    
+          data = [
+              {
+                  type: "scatterpolar",
+                  mode: 'markers',
+                  r: r,
+                  theta: theta,
+                  name: "Observed positions",
+                  marker: {
+                      color: "black",
+                      size: 5,
+                      opacity: 0.7
+                  },
+                  cliponaxis: false
+              }
+          ];
+          Plotly.react(plotter, data, plotLayout);
+
+        }
+
+      function popupInfo() {
+          var infoOption;
+          if (confirm("This tool simulates the distribution of globular clusters in a disk galaxy, as seen from a star within that galaxy.  The initial parameters approximate our own view of globular clusters in our own galaxy. \n \n  The Globular Cluster Map simulation is part of the Foothill College AstroSims project.  Click OK to open the AstroSims homepage in a new tab to see our other simulations, as well as our listing of more than 300 other Astronomy education simulations and visualizations from authors around the world. \n \n Open https://foothill.edu/astronomy/astrosims.html in a new tab?")) {
+              window.open("https://foothill.edu/astronomy/astrosims.html","_blank");
+          }
+      }
+                    
+ 
+      
+ 
+  </script>
+
+
+</body></html>
